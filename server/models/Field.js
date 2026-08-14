@@ -67,13 +67,37 @@ const YieldHistorySchema = new mongoose.Schema(
   { _id: false }
 );
 
+// One diagnosed problem. Severity and location are what make the finding
+// actionable — "leaf rust, moderate, on lower leaves" tells a farmer where to
+// look and how worried to be; a bare "leaf rust" does not.
+const PhotoProblemSchema = new mongoose.Schema(
+  {
+    name: String,
+    severity: { type: String, enum: ['low', 'moderate', 'severe'], default: 'low' },
+    location: String,
+    coveragePct: Number,
+    evidence: String,
+  },
+  { _id: false }
+);
+
 const PhotoSchema = new mongoose.Schema(
   {
     url: String,
     uploadedAt: { type: Date, default: Date.now },
     detectedCrop: String,
     detectedStage: String,
-    problems: [String],
+    confidence: Number,
+    problems: { type: [PhotoProblemSchema], default: [] },
+    overallSeverity: {
+      type: String,
+      enum: ['none', 'low', 'moderate', 'severe'],
+      default: 'none',
+    },
+    // False when the photo was blurred, dark, or not a crop at all. The UI
+    // shows the reason rather than an empty, falsely reassuring result.
+    imageUsable: { type: Boolean, default: true },
+    notes: String,
   },
   { _id: false }
 );
