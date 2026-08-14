@@ -149,7 +149,7 @@ router.post(
   })
 );
 
-// POST /fields/:id/photo — upload crop photo → DeepSeek vision
+// POST /fields/:id/photo — upload crop photo → vision diagnostics
 router.post(
   '/:id/photo',
   upload.single('photo'),
@@ -157,22 +157,49 @@ router.post(
     const field = await Field.findOne({ _id: req.params.id, userId: req.user._id });
     if (!field) return errorResponse(res, 'Field not found', 404);
     if (!req.file) return errorResponse(res, 'Photo file required', 400);
+    if (!req.file.mimetype?.startsWith('image/')) {
+      return errorResponse(res, 'That file is not an image', 400);
+    }
 
     let visionResult = null;
     try {
       visionResult = await pythonClient.vision(req.file.buffer, req.file.mimetype);
     } catch (err) {
       console.error('[fields/photo] Vision failed:', err.message);
+      // The farmer still gets a result object rather than a dead screen.
+      visionResult = {
+        crop: 'unknown',
+        confidence: 0,
+        stage: 'unknown',
+        problems: [],
+        overall_severity: 'none',
+        image_usable: false,
+        notes: 'Diagnosis service is unavailable right now. The photo was not saved.',
+      };
+      return successResponse(res, { visionResult, photosCount: field.photos.length });
     }
 
     // Store photo metadata (URL = placeholder; production would use object storage)
     field.photos.push({
       url: `data:${req.file.mimetype};base64,placeholder`,
       uploadedAt: new Date(),
-      detectedCrop: visionResult?.crop || null,
-      detectedStage: visionResult?.stage || null,
-      problems: visionResult?.problems || [],
+      detectedCrop: visionResult.crop || null,
+      detectedStage: visionResult.stage || null,
+      confidence: visionResult.confidence ?? null,
+      problems: (visionResult.problems || []).map((p) => ({
+        name: p.name,
+        severity: p.severity,
+        location: p.location,
+        coveragePct: p.coverage_pct,
+        evidence: p.evidence,
+      })),
+      overallSeverity: visionResult.overall_severity || 'none',
+      imageUsable: visionResult.image_usable !== false,
+      notes: visionResult.notes || null,
     });
+
+    // Keep the last 20 — photos are diagnostic history, not an album.
+    if (field.photos.length > 20) field.photos = field.photos.slice(-20);
     await field.save();
 
     return successResponse(res, { visionResult, photosCount: field.photos.length });

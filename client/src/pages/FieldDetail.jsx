@@ -7,6 +7,7 @@ import YieldChart from '../components/YieldChart';
 import RainfallChart from '../components/RainfallChart';
 import AdvisoryPanel from '../components/AdvisoryPanel';
 import StressBreakdown from '../components/StressBreakdown';
+import CropPhotoDiagnosis from '../components/CropPhotoDiagnosis';
 import { CROP_PARAMS_MATURITY } from '../utils/cropConstants';
 
 export default function FieldDetail() {
@@ -186,6 +187,8 @@ export default function FieldDetail() {
         {/* Right column */}
         <div className="space-y-6">
           {latestAdvisory && <AdvisoryPanel advisory={latestAdvisory} />}
+
+          <CropPhotoDiagnosis fieldId={id} onDiagnosed={loadField} />
 
           {/* Event timeline */}
           <div className="glass-card p-5">
