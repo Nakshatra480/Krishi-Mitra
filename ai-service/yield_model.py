@@ -263,6 +263,9 @@ def predict(
         "heat_factor": stress["heat_factor"],
         "water_factor": stress["water_factor"],
         "dry_spell_factor": stress["dry_spell_factor"],
+        # Full breakdown including the intermediate counts, so a stress figure
+        # can be explained on screen rather than asserted.
+        "stress_breakdown": dict(stress),
         # -- added: everything needed to render the number honestly --
         "unit": spec["unit"],
         "area_ha": round(area, 4),

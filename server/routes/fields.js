@@ -5,6 +5,7 @@ const authenticate = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const { successResponse, errorResponse } = require('../utils/response');
 const { runFieldCheck } = require('../services/fieldCheckService');
+const { CROP_VARIETIES, isValidVariety } = require('../constants/varieties');
 const { getFieldWeather } = require('../services/weatherService');
 const pythonClient = require('../services/pythonClient');
 
@@ -14,7 +15,8 @@ const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // Crop catalogue is public: the field-creation form needs it before the user
-// has an account, and it contains no user data.
+// has an account, and it contains no user data. Varieties ride along so the
+// form's dropdown and the model's validation read from the same table.
 router.get('/crops', (req, res) => {
   const crops = Object.entries(gddEngine.CROP_PARAMS).map(([value, params]) => ({
     value,
@@ -23,7 +25,7 @@ router.get('/crops', (req, res) => {
     unit: params.unit,
     perennial: params.perennial,
   }));
-  return successResponse(res, { crops });
+  return successResponse(res, { crops, varieties: CROP_VARIETIES });
 });
 
 router.use(authenticate);
@@ -101,6 +103,20 @@ router.put(
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
+
+    const existing = await Field.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!existing) return errorResponse(res, 'Field not found', 404);
+
+    // findOneAndUpdate skips pre-save middleware, so the model's variety rule
+    // has to be applied here too or this route becomes the way around it.
+    if (updates.variety && !isValidVariety(existing.crop, updates.variety)) {
+      return errorResponse(
+        res,
+        `Variety ${updates.variety} is not valid for crop ${existing.crop}`,
+        400
+      );
+    }
+
     const field = await Field.findOneAndUpdate(
       { _id: req.params.id, userId: req.user._id },
       updates,

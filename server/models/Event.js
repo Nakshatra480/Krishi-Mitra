@@ -11,6 +11,9 @@ const AdvisorySchema = new mongoose.Schema(
     },
     decisionReason: String,
     validatorPassed: { type: Boolean, default: true },
+    // True only when the challenger's objection actually changed the action.
+    // An objection discarded below threshold is noted, not shown as a block.
+    objectionApplied: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -53,6 +56,11 @@ const EventSchema = new mongoose.Schema(
     evidence: { type: mongoose.Schema.Types.Mixed, default: {} },
     advisory: { type: AdvisorySchema, default: () => ({}) },
     read: { type: Boolean, default: false, index: true },
+    // Mongoose makes a timestamps-managed createdAt immutable, which would
+    // silently discard the bump when a repeated check refreshes an existing
+    // event. The timeline sorts on this field, so a refreshed event has to be
+    // able to move back to the top.
+    createdAt: { type: Date, immutable: false },
   },
   { timestamps: true }
 );

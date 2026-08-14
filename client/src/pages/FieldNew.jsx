@@ -2,9 +2,31 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createField, getCropCatalog } from '../api/fieldsApi';
 import { cropLabel } from '../constants/crops';
+import LocationPicker from '../components/LocationPicker';
 
 // Shown as large buttons; the rest of the catalogue lives in the dropdown below.
 const QUICK_PICKS = ['rice', 'wheat', 'maize', 'cotton(lint)', 'sugarcane', 'potato'];
+
+/**
+ * Returns the first thing wrong with the chosen location, or '' when it is
+ * ready. Matched to what the server requires so a field never fails on submit
+ * for something we could have said two steps earlier.
+ */
+function locationError(location) {
+  const lat = Number(location.lat);
+  const lon = Number(location.lon);
+
+  if (location.lat === '' || location.lon === '') {
+    return 'कृपया अपना स्थान चुनें / Please set your location';
+  }
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) {
+    return 'निर्देशांक सही नहीं हैं / The coordinates are not valid';
+  }
+  if (!location.district?.trim() || !location.state?.trim()) {
+    return 'कृपया जिला और राज्य भरें / Please enter district and state';
+  }
+  return '';
+}
 
 export default function FieldNew() {
   const navigate = useNavigate();
@@ -12,10 +34,16 @@ export default function FieldNew() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [crops, setCrops] = useState([]);
+  // crop -> released varieties, served alongside the catalogue so the form can
+  // never offer a variety the server would reject.
+  const [varieties, setVarieties] = useState({});
 
   useEffect(() => {
     getCropCatalog()
-      .then((resp) => setCrops(resp.data.data.crops))
+      .then((resp) => {
+        setCrops(resp.data.data.crops);
+        setVarieties(resp.data.data.varieties || {});
+      })
       .catch(() => {
         // Offline or server down: fall back to the quick picks so the form
         // still works rather than presenting an empty crop list.
@@ -31,10 +59,27 @@ export default function FieldNew() {
   });
 
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }));
-  const updateLoc = (key, val) => setForm((f) => ({ ...f, location: { ...f.location, [key]: val } }));
   const updateSoil = (key, val) => setForm((f) => ({ ...f, soil: { ...f.soil, [key]: val } }));
 
+  // Varieties belong to one crop, so a leftover selection from the previous
+  // crop would be rejected by the server. Always clear it with the crop.
+  const selectCrop = (value) => {
+    setForm((f) => ({ ...f, crop: value, variety: '' }));
+    if (error) setError('');
+  };
+
+  const cropVarieties = varieties[form.crop] || [];
+
   async function handleSubmit() {
+    // Last line of defence: the location can still be edited after step 2, and
+    // a rejected submit here would lose the whole form.
+    const locationMessage = locationError(form.location);
+    if (locationMessage) {
+      setError(locationMessage);
+      setStep(2);
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
@@ -42,7 +87,8 @@ export default function FieldNew() {
         ...form,
         areaAcre: Number(form.areaAcre),
         location: {
-          ...form.location,
+          district: form.location.district.trim(),
+          state: form.location.state.trim(),
           lat: Number(form.location.lat),
           lon: Number(form.location.lon),
         },
@@ -91,7 +137,7 @@ export default function FieldNew() {
             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">फसल / Crop <span className="text-red-500">*</span></label>
             <div className="grid grid-cols-3 gap-3">
               {QUICK_PICKS.map((value) => (
-                <button key={value} type="button" onClick={() => { update('crop', value); if (error) setError(''); }}
+                <button key={value} type="button" onClick={() => selectCrop(value)}
                   className={`p-3.5 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${form.crop === value ? 'border-green-600 bg-green-50 text-green-800 font-bold dark:border-agri-500 dark:bg-agri-900/40 dark:text-agri-400 shadow-xs' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-white/10 dark:bg-transparent dark:text-slate-400 dark:hover:border-white/30'}`}>
                   <span className="text-xs">{cropLabel(value)}</span>
                 </button>
@@ -104,10 +150,7 @@ export default function FieldNew() {
             <select
               id="crop-select"
               value={form.crop || ''}
-              onChange={(e) => {
-                update('crop', e.target.value);
-                if (error) setError('');
-              }}
+              onChange={(e) => selectCrop(e.target.value)}
               className={`${inputClass} cursor-pointer`}
             >
               <option value="">— select crop —</option>
@@ -120,8 +163,32 @@ export default function FieldNew() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">किस्म / Variety (Optional)</label>
-              <input type="text" value={form.variety} onChange={(e) => update('variety', e.target.value)} placeholder="e.g. Swarna, HD-2967" className={inputClass} />
+              <label htmlFor="variety" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">किस्म / Variety (Optional)</label>
+              {cropVarieties.length > 0 ? (
+                <select
+                  id="variety"
+                  value={form.variety}
+                  onChange={(e) => update('variety', e.target.value)}
+                  className={`${inputClass} cursor-pointer`}
+                >
+                  <option value="">— select —</option>
+                  {cropVarieties.map((v) => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+              ) : (
+                // No curated list for this crop — accept free text rather than
+                // presenting an empty dropdown the farmer cannot get past.
+                <input
+                  id="variety"
+                  type="text"
+                  value={form.variety}
+                  onChange={(e) => update('variety', e.target.value)}
+                  placeholder={form.crop ? 'Variety name' : 'Select a crop first'}
+                  disabled={!form.crop}
+                  className={`${inputClass} disabled:opacity-50`}
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">बुवाई तिथि / Sowing Date <span className="text-red-500">*</span></label>
@@ -168,33 +235,25 @@ export default function FieldNew() {
       {step === 2 && (
         <div className="glass-card p-6 space-y-5">
           <h2 className="font-bold text-lg text-slate-900 dark:text-white">स्थान / Location</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">जिला / District</label>
-              <input id="loc-district" type="text" value={form.location.district} onChange={(e) => updateLoc('district', e.target.value)} placeholder="Barabanki" className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">राज्य / State</label>
-              <input id="loc-state" type="text" value={form.location.state} onChange={(e) => updateLoc('state', e.target.value)} placeholder="Uttar Pradesh" className={inputClass} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">अक्षांश / Latitude</label>
-              <input id="loc-lat" type="number" step="0.0001" value={form.location.lat} onChange={(e) => updateLoc('lat', e.target.value)} placeholder="26.9255" className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">देशांतर / Longitude</label>
-              <input id="loc-lon" type="number" step="0.0001" value={form.location.lon} onChange={(e) => updateLoc('lon', e.target.value)} placeholder="81.2045" className={inputClass} />
-            </div>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Find lat/lon on Google Maps: right-click → What's here?</p>
+          <LocationPicker
+            value={form.location}
+            onChange={(location) => { setForm((f) => ({ ...f, location })); if (error) setError(''); }}
+            inputClass={inputClass}
+          />
           <div className="flex gap-3 pt-2">
             <button onClick={() => setStep(1)} className="flex-1 py-3 border border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 rounded-xl font-semibold hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">← Back</button>
             <button
-              onClick={() => setStep(3)}
-              disabled={!form.location.district || !form.location.state || !form.location.lat || !form.location.lon}
-              className="flex-1 py-3 bg-green-700 hover:bg-green-600 disabled:opacity-40 text-white rounded-xl font-bold transition-colors shadow-md shadow-green-700/20"
+              type="button"
+              onClick={() => {
+                const message = locationError(form.location);
+                if (message) {
+                  setError(message);
+                  return;
+                }
+                setError('');
+                setStep(3);
+              }}
+              className="flex-1 py-3 bg-green-700 hover:bg-green-600 text-white rounded-xl font-bold transition-colors shadow-md shadow-green-700/20"
             >Next: Soil →</button>
           </div>
         </div>
