@@ -67,22 +67,7 @@ export default function Landing() {
               </a>
             </div>
 
-            {/* Social Trust row */}
-            <div className="flex items-center gap-3">
-              <div className="flex -space-x-2">
-                {['🧑‍🌾', '👨‍🌾', '👩‍🌾', '🧑‍🌾'].map((avatar, i) => (
-                  <div
-                    key={i}
-                    className={`w-8 h-8 rounded-full border border-white flex items-center justify-center text-sm shadow-xs bg-green-50`}
-                  >
-                    {avatar}
-                  </div>
-                ))}
-              </div>
-              <p className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                Trusted by <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>10,000+</span> farmers across India
-              </p>
-            </div>
+
           </div>
         </div>
       </section>
