@@ -6,6 +6,7 @@ import GDDProgressBar from '../components/GDDProgressBar';
 import YieldChart from '../components/YieldChart';
 import RainfallChart from '../components/RainfallChart';
 import AdvisoryPanel from '../components/AdvisoryPanel';
+import StressBreakdown from '../components/StressBreakdown';
 import { CROP_PARAMS_MATURITY } from '../utils/cropConstants';
 
 export default function FieldDetail() {
@@ -163,12 +164,13 @@ export default function FieldDetail() {
                 <p className="text-amber-600 dark:text-amber-400/90 text-xs font-medium mt-1">⚠ {confidenceNote}</p>
               )}
             </div>
-            <div className="glass-card p-4">
-              <p className="text-slate-600 dark:text-slate-400 text-xs font-semibold mb-1">Stress Factor</p>
-              <p className={`font-bold text-base ${(c.stressFactor || 1) < 0.8 ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-agri-400'}`}>
-                {c.stressFactor != null ? c.stressFactor.toFixed(3) : '1.000'}
-              </p>
-            </div>
+            <StressBreakdown
+              breakdown={c.stressBreakdown}
+              stressFactor={c.stressFactor}
+              baselineYield={c.baselineYield}
+              estimate={c.yieldEstimate}
+              unit={yieldUnit}
+            />
             <div className="glass-card p-4">
               <p className="text-slate-600 dark:text-slate-400 text-xs font-semibold mb-1">Last Checked</p>
               <p className="text-slate-900 dark:text-white font-medium text-sm">

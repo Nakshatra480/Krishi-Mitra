@@ -5,6 +5,49 @@
  */
 
 /**
+ * The magnitudes at which a risk is worth acting on. A challenger citing a
+ * true-but-trivial number — "95% chance of 5.7mm" — is technically verified
+ * and agronomically meaningless, so verification alone is not enough of a bar.
+ * The prompt asks the model to respect these; this enforces it, because a
+ * prompt is a request and this is a guarantee.
+ */
+const OBJECTION_THRESHOLDS = {
+  rainNext3dMm: 15,
+  soilTestAgeDays: 90,
+  heatDaysAboveMax: 3,
+};
+
+const DAY_MS = 86400000;
+
+/**
+ * Is this citation about something big enough to act on?
+ * Unknown citation subjects return true — this gate exists to filter out
+ * trivial *quantities*, not to silence risks it does not have a rule for.
+ */
+function crossesThreshold(claim, evidence) {
+  const field = String(claim.field || '').toLowerCase();
+
+  if (field.includes('rain')) {
+    // Probability never qualifies on its own; only the amount does.
+    const mm = evidence.next3DayRainfall ?? evidence.forecast_rainfall ?? 0;
+    return mm >= OBJECTION_THRESHOLDS.rainNext3dMm;
+  }
+
+  if (field.includes('soil')) {
+    if (!evidence.soilTestedOn) return false;
+    const ageDays = (Date.now() - new Date(evidence.soilTestedOn).getTime()) / DAY_MS;
+    return ageDays > OBJECTION_THRESHOLDS.soilTestAgeDays;
+  }
+
+  if (field.includes('heat') || field.includes('temp')) {
+    const hotDays = evidence.heatDaysAboveMax ?? 0;
+    return hotDays >= OBJECTION_THRESHOLDS.heatDaysAboveMax;
+  }
+
+  return true;
+}
+
+/**
  * @param {object} proposal - { proposedAction, dose }
  * @param {object} challengerResult - result from Python /challenge
  * @param {object} evidence - actual field data used to verify challenger claims
@@ -18,6 +61,7 @@ function applyPolicy(proposal, challengerResult, evidence) {
         : proposal.proposedAction === 'HARVEST' ? 'HARVEST'
         : 'HOLD',
       decisionReason: 'No challenger objection. Proposal accepted.',
+      objectionApplied: false,
     };
   }
 
@@ -41,6 +85,19 @@ function applyPolicy(proposal, challengerResult, evidence) {
         : proposal.proposedAction === 'HARVEST' ? 'HARVEST'
         : 'HOLD',
       decisionReason: 'Challenger objection discarded: no cited evidence verified against actual data.',
+      objectionApplied: false,
+    };
+  }
+
+  // Rule 3b: every cited value is real but too small to act on → discard.
+  // Without this, a light shower reads on screen as a blocking objection.
+  if (citedEvidence.length > 0 && !citedEvidence.some((claim) => crossesThreshold(claim, evidence))) {
+    return {
+      finalAction: proposal.proposedAction === 'APPLY' ? 'APPLY'
+        : proposal.proposedAction === 'HARVEST' ? 'HARVEST'
+        : 'HOLD',
+      decisionReason: 'objection below action threshold',
+      objectionApplied: false,
     };
   }
 
@@ -55,6 +112,7 @@ function applyPolicy(proposal, challengerResult, evidence) {
       return {
         finalAction: 'WAIT',
         decisionReason: `Rainfall risk verified: ${actualRain.toFixed(1)}mm expected with ${rainProb}% probability. Waiting for better window.`,
+        objectionApplied: true,
       };
     }
   }
@@ -67,6 +125,7 @@ function applyPolicy(proposal, challengerResult, evidence) {
       return {
         finalAction: 'HOLD',
         decisionReason: `Soil test is ${Math.round(daysSinceSoilTest)} days old (>90 days). Recommend fresh soil test before applying.`,
+        objectionApplied: true,
       };
     }
   }
@@ -77,7 +136,8 @@ function applyPolicy(proposal, challengerResult, evidence) {
       : proposal.proposedAction === 'HARVEST' ? 'HARVEST'
       : 'HOLD',
     decisionReason: 'Challenger objection reviewed but not sufficient to override proposal.',
+    objectionApplied: false,
   };
 }
 
-module.exports = { applyPolicy };
+module.exports = { applyPolicy, OBJECTION_THRESHOLDS };

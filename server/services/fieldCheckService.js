@@ -9,8 +9,7 @@ const pythonClient = require('./pythonClient');
 const { advise } = require('./advisorService');
 const { applyPolicy } = require('./safetyPolicyService');
 const { validate } = require('./validatorService');
-const { detectAndCreateEvents } = require('./eventDetectionService');
-const Event = require('../models/Event');
+const { detectAndCreateEvents, upsertEvent } = require('./eventDetectionService');
 const Field = require('../models/Field');
 
 async function runFieldCheck(fieldId) {
@@ -89,6 +88,21 @@ async function runFieldCheck(fieldId) {
     // low-confidence fallback must not be rendered as a firm number.
     field.current.yieldUnit = yieldResult.unit;
     field.current.yieldConfidence = yieldResult.confidence;
+    // Stored so the UI can explain the stress figure instead of asserting it.
+    field.current.stressBreakdown = yieldResult.stress_breakdown || null;
+    field.current.baselineYield = yieldResult.baseline_yield;
+
+    const sb = yieldResult.stress_breakdown;
+    if (sb) {
+      console.log(
+        `[fieldCheck] ${field.crop} @ ${field.location.district}: ` +
+        `baseline=${yieldResult.baseline_yield} stress=${sb.stress_factor}` +
+        `${sb.clamped ? ' (CLAMPED)' : ''} | ` +
+        `hot_days=${sb.hot_days} above ${sb.upper_temp_c}C, ` +
+        `rain=${sb.total_rainfall_mm}mm of ${sb.water_need_mm}mm need, ` +
+        `longest_dry_run=${sb.longest_dry_run_days}d (tolerates ${sb.dry_tolerance_days}d)`
+      );
+    }
   }
 
   // ── Step 5: Event detection ──
@@ -121,6 +135,9 @@ async function runFieldCheck(fieldId) {
   let decisionReason = advisory.reason;
   let validatorPassed = true;
   let challengerResult = null;
+  // Whether the challenger's objection actually moved the decision. Drives
+  // whether the UI shows a blocking callout or a one-line note.
+  let objectionApplied = false;
 
   if (advisory.proposedAction !== 'NONE') {
     // Build evidence object for challenger verification
@@ -139,6 +156,9 @@ async function runFieldCheck(fieldId) {
       stressFactor: yieldResult?.stress_factor || null,
       heatFactor: yieldResult?.heat_factor || null,
       drySpellFactor: yieldResult?.dry_spell_factor || null,
+      // A day count, not a factor — the safety policy needs the magnitude to
+      // decide whether a heat objection is worth acting on.
+      heatDaysAboveMax: yieldResult?.stress_breakdown?.hot_days ?? 0,
       hasActiveHazard: activeHazard,
     };
 
@@ -151,9 +171,10 @@ async function runFieldCheck(fieldId) {
     }
 
     // ── Step 8: Safety Policy ──
-    const policyResult = applyPolicy(advisory, challengerResult, { ...evidence, ...evidence });
+    const policyResult = applyPolicy(advisory, challengerResult, evidence);
     finalAction = policyResult.finalAction;
     decisionReason = policyResult.decisionReason;
+    objectionApplied = policyResult.objectionApplied === true;
 
     // ── Step 9: Validator ──
     const validationResult = validate({
@@ -174,7 +195,9 @@ async function runFieldCheck(fieldId) {
     // Create advisory event if action is actionable
     if (finalAction !== 'NONE') {
       const severityMap = { APPLY: 'medium', HARVEST: 'high', WAIT: 'low', HOLD: 'low' };
-      await Event.create({
+      // Same dedupe path as the detectors — re-running a check restates the
+      // advisory rather than stacking another copy on the timeline.
+      await upsertEvent({
         fieldId: field._id,
         userId: field.userId,
         type: advisory.type || 'FERTILIZER_WINDOW',
@@ -193,6 +216,7 @@ async function runFieldCheck(fieldId) {
           finalAction,
           decisionReason,
           validatorPassed,
+          objectionApplied,
         },
       });
     }

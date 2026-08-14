@@ -20,6 +20,15 @@ RULES — NEVER BREAK THESE:
 4. Allowed recommended_action values: WAIT, HOLD, REDUCE_DOSE, PROCEED.
 5. Return ONLY valid JSON. No markdown. No prose before or after.
 
+QUANTITATIVE THRESHOLDS — do not raise an objection below these:
+  next3DayRainfall below 15mm       -> NOT a valid rainfall objection, whatever the probability
+  temperature below the crop's upper limit -> NOT a valid heat objection
+  soilTestedOn younger than 90 days -> NOT a valid staleness objection
+
+Rain PROBABILITY alone is never sufficient. The AMOUNT must exceed the threshold.
+A 95% chance of 5mm is a light shower, not a reason to delay fertiliser.
+If nothing crosses a threshold, return challenged: false.
+
 OUTPUT SCHEMA:
 {
   "challenged": boolean,

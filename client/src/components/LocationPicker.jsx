@@ -181,20 +181,20 @@ export default function LocationPicker({ value, onChange, inputClass }) {
     <div className="space-y-5">
       {/* Chosen location — the same card however it was chosen */}
       {hasCoords ? (
-        <div className="rounded-xl border border-agri-700/60 bg-agri-900/25 p-4">
+        <div className="rounded-xl border border-green-300 dark:border-agri-700/60 bg-green-50 dark:bg-agri-900/25 p-4">
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 text-agri-400 shrink-0"><CheckIcon /></span>
+            <span className="mt-0.5 text-green-700 dark:text-agri-400 shrink-0"><CheckIcon /></span>
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-agri-400 font-medium">स्थान चुना गया / Location set</p>
-              <p className="text-white font-semibold truncate mt-0.5">
+              <p className="text-xs text-green-700 dark:text-agri-400 font-medium">स्थान चुना गया / Location set</p>
+              <p className="text-slate-900 dark:text-white font-semibold truncate mt-0.5">
                 {placeLabel || value.district || 'आपका स्थान / Your location'}
               </p>
               {(value.district || value.state) && (
-                <p className="text-sm text-slate-300 truncate">
+                <p className="text-sm text-slate-700 dark:text-slate-300 truncate">
                   {[value.district, value.state].filter(Boolean).join(', ')}
                 </p>
               )}
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 {value.lat}, {value.lon}
                 {accuracyM != null && <span> · ±{accuracyM} m</span>}
               </p>
@@ -202,7 +202,7 @@ export default function LocationPicker({ value, onChange, inputClass }) {
             <button
               type="button"
               onClick={handleClear}
-              className="text-sm text-slate-400 hover:text-white underline underline-offset-2 shrink-0 cursor-pointer"
+              className="text-sm text-slate-500 dark:text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white underline underline-offset-2 shrink-0 cursor-pointer"
             >
               बदलें / Change
             </button>
@@ -212,14 +212,14 @@ export default function LocationPicker({ value, onChange, inputClass }) {
             <button
               type="button"
               onClick={() => setShowNameFields(true)}
-              className="mt-3 text-sm text-slate-400 hover:text-white underline underline-offset-2 cursor-pointer"
+              className="mt-3 text-sm text-slate-500 dark:text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white underline underline-offset-2 cursor-pointer"
             >
               सही करें / Correct district or state
             </button>
           )}
 
           {namesMissing && (
-            <p className="mt-3 text-sm text-amber-400">
+            <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">
               जिला और राज्य भरना ज़रूरी है / District and state are still needed
             </p>
           )}
@@ -227,8 +227,8 @@ export default function LocationPicker({ value, onChange, inputClass }) {
           {nameFieldsOpen && (
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div>
-                <label htmlFor="loc-district" className="block text-sm text-slate-300 mb-1">
-                  जिला / District <span className="text-red-400">*</span>
+                <label htmlFor="loc-district" className="block text-sm text-slate-700 dark:text-slate-300 mb-1">
+                  जिला / District <span className="text-red-600 dark:text-red-400">*</span>
                 </label>
                 <input
                   id="loc-district"
@@ -240,8 +240,8 @@ export default function LocationPicker({ value, onChange, inputClass }) {
                 />
               </div>
               <div>
-                <label htmlFor="loc-state" className="block text-sm text-slate-300 mb-1">
-                  राज्य / State <span className="text-red-400">*</span>
+                <label htmlFor="loc-state" className="block text-sm text-slate-700 dark:text-slate-300 mb-1">
+                  राज्य / State <span className="text-red-600 dark:text-red-400">*</span>
                 </label>
                 <input
                   id="loc-state"
@@ -261,23 +261,23 @@ export default function LocationPicker({ value, onChange, inputClass }) {
             type="button"
             onClick={handleUseMyLocation}
             disabled={locating}
-            className="w-full py-4 px-4 bg-agri-600 hover:bg-agri-500 disabled:opacity-60 text-white rounded-xl font-semibold transition-colors cursor-pointer shadow-lg hover:shadow-agri-500/20 active:scale-[0.99] flex items-center justify-center gap-3"
+            className="w-full py-4 px-4 bg-green-700 dark:bg-agri-600 hover:bg-green-600 dark:hover:bg-agri-500 disabled:opacity-60 text-slate-900 dark:text-white rounded-xl font-semibold transition-colors cursor-pointer shadow-lg hover:shadow-agri-500/20 active:scale-[0.99] flex items-center justify-center gap-3"
           >
             {locating ? <div className="spinner w-5 h-5" /> : <CrosshairIcon />}
             {locating ? 'स्थान लिया जा रहा है… / Getting location…' : 'मेरा स्थान इस्तेमाल करें / Use my location'}
           </button>
-          <p className="text-xs text-slate-500 -mt-3 text-center">
+          <p className="text-xs text-slate-500 dark:text-slate-400 -mt-3 text-center">
             खेत पर खड़े होकर दबाएँ / Tap this while standing at your field
           </p>
 
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-white/10" />
-            <span className="text-xs text-slate-500">या / or</span>
-            <div className="flex-1 h-px bg-white/10" />
+            <div className="flex-1 h-px bg-slate-200 dark:bg-white/10" />
+            <span className="text-xs text-slate-500 dark:text-slate-400">या / or</span>
+            <div className="flex-1 h-px bg-slate-200 dark:bg-white/10" />
           </div>
 
           <div>
-            <label htmlFor="place-search" className="block text-sm text-slate-300 mb-1">
+            <label htmlFor="place-search" className="block text-sm text-slate-700 dark:text-slate-300 mb-1">
               अपना गाँव या शहर खोजें / Search your village or town
             </label>
             <input
@@ -290,25 +290,25 @@ export default function LocationPicker({ value, onChange, inputClass }) {
               autoComplete="off"
             />
 
-            {searching && <p className="text-xs text-slate-500 mt-2">खोज रहे हैं… / Searching…</p>}
-            {searchError && <p className="text-xs text-amber-400 mt-2">{searchError}</p>}
+            {searching && <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">खोज रहे हैं… / Searching…</p>}
+            {searchError && <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">{searchError}</p>}
             {!searching && !searchError && searched && results.length === 0 && (
-              <p className="text-xs text-slate-500 mt-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                 कुछ नहीं मिला — दूसरा नाम आज़माएँ / No matches — try a nearby town
               </p>
             )}
 
             {results.length > 0 && (
-              <ul className="mt-2 border border-white/10 rounded-lg divide-y divide-white/5 overflow-hidden">
+              <ul className="mt-2 border border-slate-200 dark:border-white/10 rounded-lg divide-y divide-slate-200 dark:divide-white/5 overflow-hidden">
                 {results.map((place) => (
                   <li key={`${place.name}-${place.district}-${place.lat}-${place.lon}`}>
                     <button
                       type="button"
                       onClick={() => handlePickPlace(place)}
-                      className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer"
+                      className="w-full text-left px-4 py-3 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
                     >
-                      <span className="block text-white text-sm font-medium">{place.name}</span>
-                      <span className="block text-xs text-slate-400">
+                      <span className="block text-slate-900 dark:text-white text-sm font-medium">{place.name}</span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-500 dark:text-slate-400">
                         {[place.subDistrict, place.district, place.state].filter(Boolean).join(', ')}
                       </span>
                     </button>
@@ -321,7 +321,7 @@ export default function LocationPicker({ value, onChange, inputClass }) {
       )}
 
       {geoError && (
-        <div className="bg-amber-900/30 border border-amber-800/60 text-amber-300 px-4 py-3 rounded-lg text-sm">
+        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 px-4 py-3 rounded-lg text-sm">
           {geoError}
         </div>
       )}
@@ -332,7 +332,7 @@ export default function LocationPicker({ value, onChange, inputClass }) {
         <button
           type="button"
           onClick={() => setShowManual((s) => !s)}
-          className="text-xs text-slate-500 hover:text-slate-300 underline underline-offset-2 cursor-pointer"
+          className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-300 underline underline-offset-2 cursor-pointer"
         >
           {showManual ? 'छिपाएँ / Hide' : 'निर्देशांक खुद भरें / Enter coordinates manually'}
         </button>
@@ -340,7 +340,7 @@ export default function LocationPicker({ value, onChange, inputClass }) {
         {showManual && (
           <div className="grid grid-cols-2 gap-4 mt-3">
             <div>
-              <label htmlFor="loc-lat" className="block text-sm text-slate-300 mb-1">अक्षांश / Latitude</label>
+              <label htmlFor="loc-lat" className="block text-sm text-slate-700 dark:text-slate-300 mb-1">अक्षांश / Latitude</label>
               <input
                 id="loc-lat"
                 type="number"
@@ -352,7 +352,7 @@ export default function LocationPicker({ value, onChange, inputClass }) {
               />
             </div>
             <div>
-              <label htmlFor="loc-lon" className="block text-sm text-slate-300 mb-1">देशांतर / Longitude</label>
+              <label htmlFor="loc-lon" className="block text-sm text-slate-700 dark:text-slate-300 mb-1">देशांतर / Longitude</label>
               <input
                 id="loc-lon"
                 type="number"

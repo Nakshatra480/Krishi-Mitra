@@ -6,12 +6,53 @@
 const Event = require('../models/Event');
 const { searchHazards } = require('./tavilyService');
 
+// Running a check twice in a day re-detects the same conditions and used to
+// insert a second identical row, so a farmer opening the timeline saw the same
+// warning stacked several times. Within this window an event is refreshed in
+// place instead.
+const DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 const HEAVY_RAIN_MM = 25;
 const HEAT_DAYS_THRESHOLD = 3;
 const DRY_SPELL_DAYS = 14;
 const FERTILIZER_RAIN_LIMIT = 15;
 const FERTILIZER_WINDOW_DAYS = 3;
 const YIELD_SHIFT_PCT = 0.10;
+
+/**
+ * Create an event, or refresh the same field's event of that type if one was
+ * already raised in the last 24 hours.
+ *
+ * STAGE_CHANGE is exempt: two stage changes in one day are two real, distinct
+ * transitions, and collapsing them would erase part of the crop's history.
+ *
+ * @param {object} doc - the event to create
+ * @returns {Promise<object>} the created or refreshed event
+ */
+async function upsertEvent(doc) {
+  if (doc.type !== 'STAGE_CHANGE') {
+    const recent = await Event.findOne({
+      fieldId: doc.fieldId,
+      type: doc.type,
+      createdAt: { $gte: new Date(Date.now() - DEDUPE_WINDOW_MS) },
+    }).sort({ createdAt: -1 });
+
+    if (recent) {
+      recent.severity = doc.severity;
+      recent.title = doc.title;
+      recent.message = doc.message;
+      recent.evidence = doc.evidence ?? recent.evidence;
+      if (doc.advisory) recent.advisory = doc.advisory;
+      // Bumping the timestamp keeps the timeline ordered by when the condition
+      // was last confirmed, not when it was first seen.
+      recent.createdAt = new Date();
+      await recent.save();
+      return recent;
+    }
+  }
+
+  return Event.create(doc);
+}
 
 /**
  * @param {object} field - Mongoose field document
@@ -170,8 +211,10 @@ async function detectAndCreateEvents(
     triggeredTypes.push('HARVEST_WINDOW');
   }
 
-  if (eventsToCreate.length > 0) {
-    await Event.insertMany(eventsToCreate);
+  // Sequential rather than insertMany: each one has to check for a recent
+  // twin first, and a handful of events per check is not worth parallelising.
+  for (const doc of eventsToCreate) {
+    await upsertEvent(doc);
   }
 
   return triggeredTypes;
@@ -186,4 +229,4 @@ function longestDryRun(rainfallArray) {
   return max;
 }
 
-module.exports = { detectAndCreateEvents };
+module.exports = { detectAndCreateEvents, upsertEvent };

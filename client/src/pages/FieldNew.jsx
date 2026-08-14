@@ -34,10 +34,16 @@ export default function FieldNew() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [crops, setCrops] = useState([]);
+  // crop -> released varieties, served alongside the catalogue so the form can
+  // never offer a variety the server would reject.
+  const [varieties, setVarieties] = useState({});
 
   useEffect(() => {
     getCropCatalog()
-      .then((resp) => setCrops(resp.data.data.crops))
+      .then((resp) => {
+        setCrops(resp.data.data.crops);
+        setVarieties(resp.data.data.varieties || {});
+      })
       .catch(() => {
         // Offline or server down: fall back to the quick picks so the form
         // still works rather than presenting an empty crop list.
@@ -54,6 +60,15 @@ export default function FieldNew() {
 
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }));
   const updateSoil = (key, val) => setForm((f) => ({ ...f, soil: { ...f.soil, [key]: val } }));
+
+  // Varieties belong to one crop, so a leftover selection from the previous
+  // crop would be rejected by the server. Always clear it with the crop.
+  const selectCrop = (value) => {
+    setForm((f) => ({ ...f, crop: value, variety: '' }));
+    if (error) setError('');
+  };
+
+  const cropVarieties = varieties[form.crop] || [];
 
   async function handleSubmit() {
     // Last line of defence: the location can still be edited after step 2, and
@@ -122,7 +137,7 @@ export default function FieldNew() {
             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">फसल / Crop <span className="text-red-500">*</span></label>
             <div className="grid grid-cols-3 gap-3">
               {QUICK_PICKS.map((value) => (
-                <button key={value} type="button" onClick={() => { update('crop', value); if (error) setError(''); }}
+                <button key={value} type="button" onClick={() => selectCrop(value)}
                   className={`p-3.5 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${form.crop === value ? 'border-green-600 bg-green-50 text-green-800 font-bold dark:border-agri-500 dark:bg-agri-900/40 dark:text-agri-400 shadow-xs' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-white/10 dark:bg-transparent dark:text-slate-400 dark:hover:border-white/30'}`}>
                   <span className="text-xs">{cropLabel(value)}</span>
                 </button>
@@ -135,10 +150,7 @@ export default function FieldNew() {
             <select
               id="crop-select"
               value={form.crop || ''}
-              onChange={(e) => {
-                update('crop', e.target.value);
-                if (error) setError('');
-              }}
+              onChange={(e) => selectCrop(e.target.value)}
               className={`${inputClass} cursor-pointer`}
             >
               <option value="">— select crop —</option>
@@ -151,8 +163,32 @@ export default function FieldNew() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">किस्म / Variety (Optional)</label>
-              <input type="text" value={form.variety} onChange={(e) => update('variety', e.target.value)} placeholder="e.g. Swarna, HD-2967" className={inputClass} />
+              <label htmlFor="variety" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">किस्म / Variety (Optional)</label>
+              {cropVarieties.length > 0 ? (
+                <select
+                  id="variety"
+                  value={form.variety}
+                  onChange={(e) => update('variety', e.target.value)}
+                  className={`${inputClass} cursor-pointer`}
+                >
+                  <option value="">— select —</option>
+                  {cropVarieties.map((v) => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+              ) : (
+                // No curated list for this crop — accept free text rather than
+                // presenting an empty dropdown the farmer cannot get past.
+                <input
+                  id="variety"
+                  type="text"
+                  value={form.variety}
+                  onChange={(e) => update('variety', e.target.value)}
+                  placeholder={form.crop ? 'Variety name' : 'Select a crop first'}
+                  disabled={!form.crop}
+                  className={`${inputClass} disabled:opacity-50`}
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">बुवाई तिथि / Sowing Date <span className="text-red-500">*</span></label>

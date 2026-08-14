@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const cropParams = require('../data/cropParams.json');
+const { isValidVariety } = require('../constants/varieties');
 
 const SUPPORTED_CROPS = new Set(Object.keys(cropParams.crops));
 
@@ -45,6 +46,13 @@ const CurrentStateSchema = new mongoose.Schema(
       enum: ['high', 'medium', 'low', 'very_low'],
     },
     stressFactor: Number,
+    // The unadjusted statistical prediction, kept alongside the stressed one so
+    // the screen can show the arithmetic: baseline x stress = estimate.
+    baselineYield: Number,
+    // Components and the counts behind them (hot days, rainfall vs need,
+    // longest dry run), straight from the stress model. Mixed because the
+    // model owns the shape.
+    stressBreakdown: { type: mongoose.Schema.Types.Mixed, default: null },
     lastCheckedAt: Date,
   },
   { _id: false }
@@ -115,5 +123,17 @@ const FieldSchema = new mongoose.Schema(
 );
 
 FieldSchema.index({ userId: 1, status: 1 });
+
+/**
+ * A variety belongs to exactly one crop, so a wheat line saved against a rice
+ * field is a data error, not a preference. Enforced here rather than only in
+ * the form so the API and the seed script are held to the same rule.
+ */
+FieldSchema.pre('save', function checkVariety(next) {
+  if (this.variety && !isValidVariety(this.crop, this.variety)) {
+    return next(new Error(`Variety ${this.variety} is not valid for crop ${this.crop}`));
+  }
+  return next();
+});
 
 module.exports = mongoose.model('Field', FieldSchema);
